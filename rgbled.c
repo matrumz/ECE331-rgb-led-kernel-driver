@@ -45,9 +45,12 @@ static bool alloc_chrdev = false;
 static bool add_cdev = false;
 
 /* Other necessary global variables */
-dev_t dev;
-//static struct cdev chardev;
-static struct class * rgbled_class = NULL;
+dev_t devno;
+//static struct class * rgbled_class = NULL;
+struct rgbled_dev {
+	struct cdev cdev;
+};
+static struct rgbled_dev dev;
 static const struct file_operations rgbled_fops = {
 	.owner = THIS_MODULE,
 //	.open = rgbled_open,
@@ -72,11 +75,11 @@ int led_init(void)
 
 	/* Allocate dynamic device number */
 	if (rgbled_major) {
-		dev = MKDEV(rgbled_major, rgbled_minor);
-		err = register_chrdev_region(dev, COUNT, NAME);
+		devno = MKDEV(rgbled_major, rgbled_minor);
+		err = register_chrdev_region(devno, COUNT, NAME);
 	} else {
-		err = alloc_chrdev_region(&dev, rgbled_minor, COUNT, NAME);
-		rgbled_major = MAJOR(dev);
+		err = alloc_chrdev_region(&devno, rgbled_minor, COUNT, NAME);
+		rgbled_major = MAJOR(devno);
 	}
 	if (err) {
 		printk(KERN_ERR "E REGISTERING DEVICE NUMBERS : %d\n", -err );
@@ -86,15 +89,16 @@ int led_init(void)
 		alloc_chrdev = true;
 	
 	/* Create device file */
-/*	cdev_init(&chardev, &rgbled_fops);
-	chardev.owner = THIS_MODULE;
-	if ((err = cdev_add(&chardev, dev, COUNT))) {
+	cdev_init(&(dev.cdev), &rgbled_fops);
+	dev.cdev.owner = THIS_MODULE;
+	dev.cdev.ops = &rgbled_fops;
+	if ((err = cdev_add(&(dev.cdev), devno, COUNT))) {
 		printk(KERN_ERR "E ADDING CDEV : %d", -err);
-		led exit();
+		led_exit();
 		return -err;
 	} else
 		add_cdev = true;
-*/
+
 	return 0;
 }
 
@@ -103,15 +107,15 @@ void led_exit(void)
 	printk(KERN_ALERT "LED leaving!\n");
 
 	if (alloc_chrdev)
-		unregister_chrdev_region(dev, COUNT);
-	
+		unregister_chrdev_region(devno, COUNT);
+	if (add_cdev)
+		cdev_del(&(dev.cdev));
 }
 
 module_init(led_init);
 module_exit(led_exit);
 
 MODULE_LICENSE("GPL");
-/*MODULE_AUTHOR(RGBLED_MOD_AUTHOR);
-MODULE_DESCRIPTION(RGBLED_MOD_DESCR);
-MODULE_SUPPORTED_DEVICE(RGBLED_MOD_SDEV);
-*/
+//MODULE_AUTHOR(RGBLED_MOD_AUTHOR);
+//MODULE_DESCRIPTION(RGBLED_MOD_DESCR);
+//MODULE_SUPPORTED_DEVICE(RGBLED_MOD_SDEV);
