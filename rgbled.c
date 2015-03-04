@@ -25,9 +25,10 @@
 #include <linux/ioctl.h>	/* Required for ioctl commands */
 #include <linux/delay.h>	/* Required for udelay */
 #include <linux/errno.h>	/* Set error messages */
+#include <linux/cdev.h>		/* Char device registration */
 #include <asm/uaccess.h>	/* Move data to and from user-space */
-/* #include <asm/semaphore.h>	 Required for use of semaphores */
-/* #include <linux/tty.h>	 used for console_print() */
+//#include <asm/semaphore.h>	/*  Required for use of semaphores */
+//#include <linux/tty.h>	 /* Used for console_print() */
 
 /* Defines for module */
 #define RGBLED_MOD_AUTHOR RUMSEY
@@ -40,12 +41,24 @@
 #define MODE 222
 
 /* Used to keep track of registrations to handle cleanup */
-bool alloc_chrdev = false;
+static bool alloc_chrdev = false;
+static bool add_cdev = false;
 
 /* Other necessary global variables */
 dev_t dev;
+//static struct cdev chardev;
+static struct class * rgbled_class = NULL;
+static const struct file_operations rgbled_fops = {
+	.owner = THIS_MODULE,
+//	.open = rgbled_open,
+//	.release = rgbled_release,
+//	.write = rgbled_write,
+//	.read = NULL,
+//	.ioctl = rgbled_ioctl,
+};
+dev_t rgbled_major = 0, rgbled_minor = 0;
 
-/* Function list */
+/* Function prototypes */
 static int __init led_init(void);
 static void led_exit(void);
 
@@ -58,15 +71,30 @@ int led_init(void)
 	printk(KERN_ALERT "LED here!\n");
 
 	/* Allocate dynamic device number */
-	if ((err = alloc_chrdev_region(&dev, FIRST, COUNT, NAME))) {
-		printk(KERN_ERR "E ALLOCATING DEVICE NUMBERS : %d", -err);
+	if (rgbled_major) {
+		dev = MKDEV(rgbled_major, rgbled_minor);
+		err = register_chrdev_region(dev, COUNT, NAME);
+	} else {
+		err = alloc_chrdev_region(&dev, rgbled_minor, COUNT, NAME);
+		rgbled_major = MAJOR(dev);
+	}
+	if (err) {
+		printk(KERN_ERR "E REGISTERING DEVICE NUMBERS : %d\n", -err );
 		led_exit();
 		return -err;
 	} else
 		alloc_chrdev = true;
 	
-	/* Create device files */
-
+	/* Create device file */
+/*	cdev_init(&chardev, &rgbled_fops);
+	chardev.owner = THIS_MODULE;
+	if ((err = cdev_add(&chardev, dev, COUNT))) {
+		printk(KERN_ERR "E ADDING CDEV : %d", -err);
+		led exit();
+		return -err;
+	} else
+		add_cdev = true;
+*/
 	return 0;
 }
 
