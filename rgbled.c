@@ -26,6 +26,7 @@
 #include <linux/delay.h>	/* Required for udelay */
 #include <linux/errno.h>	/* Set error messages */
 #include <linux/cdev.h>		/* Char device registration */
+#include <linux/device.h>	/* Creation of device file */
 #include <asm/uaccess.h>	/* Move data to and from user-space */
 //#include <asm/semaphore.h>	/*  Required for use of semaphores */
 //#include <linux/tty.h>	 /* Used for console_print() */
@@ -43,10 +44,13 @@
 /* Used to keep track of registrations to handle cleanup */
 static bool alloc_chrdev = false;
 static bool add_cdev = false;
+static bool create_device = false;
+static bool create_class = false;
 
 /* Other necessary global variables */
 dev_t devno;
-//static struct class * rgbled_class = NULL;
+static struct class *rgbled_class = NULL;
+static struct file *filp = NULL;
 struct rgbled_dev {
 	struct cdev cdev;
 };
@@ -88,7 +92,25 @@ int led_init(void)
 	} else
 		alloc_chrdev = true;
 	
-	/* Create device file */
+	/* Build class */
+	if ((rgbled_class = class_create(THIS_MODULE, NAME)) == NULL) {
+		printk(KERN_ERR "E CREATING CLASS\n");
+		led_exit();
+		return -1;
+//CHANGE THIS RETURN VALUE AT SOME POINT
+	} else
+		create_class = true;
+
+	/* Create device from class */
+	if (device_create(rgbled_class, NULL, devno, NULL, NAME) == NULL) {
+		printk(KERN_ERR "E CREATING DEVICE\n");
+		led_exit();
+		return -1;
+//CHANGE THIS RETURN VALUE AT SOME POINT
+	} else 
+		create_device = true;
+	
+	/* Register device */
 	cdev_init(&(dev.cdev), &rgbled_fops);
 	dev.cdev.owner = THIS_MODULE;
 	dev.cdev.ops = &rgbled_fops;
@@ -106,10 +128,14 @@ void led_exit(void)
 {
 	printk(KERN_ALERT "LED leaving!\n");
 
-	if (alloc_chrdev)
-		unregister_chrdev_region(devno, COUNT);
 	if (add_cdev)
 		cdev_del(&(dev.cdev));
+	if (create_device)
+		device_destroy(rgbled_class, devno);
+	if (create_class)
+		class_destroy(rgbled_class);
+	if (alloc_chrdev)
+		unregister_chrdev_region(devno, COUNT);
 }
 
 module_init(led_init);
