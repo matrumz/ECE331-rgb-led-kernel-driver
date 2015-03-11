@@ -1,6 +1,6 @@
 # Project 1 kernel module make file
 
-obj-m += rgbled.o
+obj-m += rgbled2.o
 
 all:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
