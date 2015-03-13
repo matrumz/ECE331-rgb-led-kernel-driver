@@ -1,7 +1,7 @@
 /* vim: set tabstop=4 softtabstop=0 noexpandtab shiftwidth=4 : */
 /* 
  * Author: Mathew Rumsey
- * Date: 03 12 15
+ * Date: 03 13 15
  * 
  * This file contains the source code for ECE 331 Project #1.
  * This is a kernel module that interfaces with the RGB LED on Sheaff's 
@@ -38,7 +38,7 @@
 #include <linux/mutex.h>	/* Required for use of mutexes */
 #include <linux/gpio.h>		/* Required for use of GPIO pins */
 #include <asm/uaccess.h>	/* Move data to and from user-space */
-#include "myioctl.h"		/* My ioctl command is here (sync with user) */
+#include "rgbled2.h"		/* Definitions that must be synced with user */
 
 /* Defines for module */
 #define RGBLED_MOD_AUTHOR "RUMSEY"
@@ -57,11 +57,12 @@ static int __init rgbled_init(void);
 static void rgbled_exit(void);
 static int rgbled_open(struct inode *, struct file *);
 static int rgbled_release(struct inode *, struct file *); 
-static int rgbled_set(u64 __user *);
+static int rgbled_set(int, int, int);
 static char *rgbled_perm(struct device *dev, umode_t *mode);
 static long rgbled_unlocked_ioctl(struct file *, unsigned int, unsigned long);
 static int rgbled_gpio_config(void);
 static char get_int_bit(int, u16);
+static int rgbled_write_color(COLOR __user *);
 
 /* Used to keep track of registrations to handle cleanup */
 static bool alloc_chrdev = false;
@@ -77,13 +78,6 @@ static bool clk_pin_taken = false;
 //enum state {low, high};
 //enum direction {out, in};
 
-/* Struct defines */
-//struct rpi_gpio_pin {
-//	const u8 pin_num;
-//	enum state state;
-//	enum direction dir;
-//};
-
 struct rgbled_dev {
 	struct cdev cdev;
 	struct class *rgbled_class;
@@ -91,11 +85,6 @@ struct rgbled_dev {
 	dev_t devno;
 	dev_t rgbled_major; 
 	dev_t rgbled_minor; 
-//	spinlock_t check_mtx_sl;
-//	struct rpi_gpio_pin red_pin;
-//	struct rpi_gpio_pin green_pin;
-//	struct rpi_gpio_pin blue_pin;
-//	struct rpi_gpio_pin clk_pin;
 	struct gpio red_pin;
 	struct gpio green_pin;
 	struct gpio blue_pin;
@@ -108,10 +97,6 @@ static struct rgbled_dev first_dev = {
 	/* 0 for dynamic assignment */
 	.rgbled_major = 0, 
 	.rgbled_minor = 0, 
-//	.red_pin = {.pin_num=15, .state=low, .dir=out},
-//	.green_pin = {.pin_num=16, .state=low, .dir=out},
-//	.blue_pin = {.pin_num=18, .state=low, .dir=out},
-//	.clk_pin = {.pin_num=22, .state=low, .dir=out},
 	.red_pin = {.gpio=22, .flags=GPIOF_OUT_INIT_LOW, .label="LED red val"},
 	.green_pin = {.gpio=23, .flags=GPIOF_OUT_INIT_LOW, .label="LED green val"},
 	.blue_pin = {.gpio=24, .flags=GPIOF_OUT_INIT_LOW, .label="LED blue val"},
@@ -198,9 +183,6 @@ int rgbled_init(void)
 	/* Initialize spinlocks */
 //	spin_lock_init(&(first_dev.check_mtx_sl));
 
-// Test setting a color
-rgbled_set(NULL);
-
 	return 0;
 }
 
@@ -260,7 +242,7 @@ long rgbled_unlocked_ioctl(struct file * filp, unsigned int cmd,
 	/* Service list of ioctl() commands */
 	switch (cmd) {
 		case (IOCTL_WRITE): /* User set LED color */
-			return rgbled_set((void *)arg);
+			return rgbled_write_color((COLOR *)arg);
 			break;
 		default: /* User entered bad command */
 			printk(KERN_WARNING 
@@ -301,36 +283,67 @@ int rgbled_release(struct inode *inode, struct file *filp)
 	return 0;
 }
 
-int rgbled_set(u64 *src)
+int rgbled_write_color(COLOR * ucolor)
 {
-	int err;
-	int i = 0;
-	u16 rtest = 2000;
-	u16 gtest = 0;
-	u16 btest = 0;
+	int err = 0;
+	COLOR kcolor;
 
 /* ========== END VARIABLE LIST ========== */
+
+	/* Copy values to kernel */
+	if (copy_from_user(&kcolor, ucolor, sizeof(COLOR))) {
+		printk(KERN_WARNING "W GETTING COLOR FROM USER\n");
+		return -EFAULT;
+	}
 
 	/* 
 	 * Wait in line to set LED color.
 	 * Allow interrupts to cancel call.
 	 */
-	if ((err = mutex_lock_interruptible(&(first_dev.write_mtx))))
+	if ((err = mutex_lock_interruptible(&(first_dev.write_mtx)))) {
+		printk(KERN_WARNING "W WAITING PROCESS INTERRUPTED\n");
 		return err;
+	}
+
+	/* Set LED color */
+	err = rgbled_set(kcolor.r, kcolor.g, kcolor.b);
+
+	/* Release mutex */
+	mutex_unlock(&(first_dev.write_mtx));
+
+	return err;
+}
+
+int rgbled_set(int rv, int gv, int bv)
+{
+	int i = 0;
+
+/* ========== END VARIABLE LIST ========== */
+
+	/* Test if arguments are out of range */
+	if ((rv < 0) || (rv > 2047)) {
+		printk(KERN_WARNING "W BAD COLOR NUMBER\n");
+		return -EINVAL; 
+	}   
+	if ((gv < 0) || (gv > 2047)) {
+		printk(KERN_WARNING "W BAD COLOR NUMBER\n");
+		return -EINVAL; 
+	}   
+	if ((bv < 0) || (bv > 2047)) {
+		printk(KERN_WARNING "W BAD COLOR NUMBER\n");
+		return -EINVAL;
+	}
 
 	/* Write a value */
 	for (i = 0; i < 10; i++) {
-		gpio_set_value(first_dev.red_pin.gpio, (int)(!get_int_bit(i, rtest)));
-		gpio_set_value(first_dev.green_pin.gpio, (int)(!get_int_bit(i, gtest)));
-		gpio_set_value(first_dev.blue_pin.gpio, (int)(!get_int_bit(i, btest)));
+		gpio_set_value(first_dev.red_pin.gpio, (int)(!get_int_bit(i, rv)));
+		gpio_set_value(first_dev.green_pin.gpio, (int)(!get_int_bit(i, gv)));
+		gpio_set_value(first_dev.blue_pin.gpio, (int)(!get_int_bit(i, bv)));
 		gpio_set_value(first_dev.clk_pin.gpio, 1);
 		udelay(10);
 		gpio_set_value(first_dev.clk_pin.gpio, 0);
 		udelay(10);
 	}
-
-	/* Release mutex */
-	mutex_unlock(&(first_dev.write_mtx));
 
 	return 0;
 }
@@ -346,6 +359,15 @@ char get_int_bit(int bit, u16 num)
 void rgbled_exit(void)
 {
 	printk(KERN_ALERT "rgbled leaving!\n");
+
+	/* Attempt to turn off LED */
+	if (mutex_trylock(&(first_dev.write_mtx)) && red_pin_taken
+												&& green_pin_taken
+												&& blue_pin_taken
+												&& clk_pin_taken) {
+		rgbled_set(0, 0, 0);
+		mutex_unlock(&(first_dev.write_mtx));
+	}
 
 	/* Deallocate resources that were created in init() */
 	if (red_pin_taken)
