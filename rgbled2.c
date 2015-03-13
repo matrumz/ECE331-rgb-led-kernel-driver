@@ -67,6 +67,10 @@ static bool alloc_chrdev = false;
 static bool add_cdev = false;
 static bool create_device = false;
 static bool create_class = false;
+static bool red_pin_taken = false;
+static bool green_pin_taken = false;
+static bool blue_pin_taken = false;
+static bool clk_pin_taken = false;
 
 /* Enumeration defines */
 //enum state {low, high};
@@ -181,17 +185,17 @@ int rgbled_init(void)
 	} else
 		add_cdev = true;
 	
-	/* Initialize mutexes */
-	mutex_init(&(first_dev.write_mtx));
-
-	/* Initialize spinlocks */
-	spin_lock_init(&(first_dev.check_mtx_sl));
-
 	/* Configure GPIO pins */
 	if ((err = rgbled_gpio_config())) {
 		rgbled_exit();
 		return err;
 	}
+
+	/* Initialize mutexes */
+	mutex_init(&(first_dev.write_mtx));
+
+	/* Initialize spinlocks */
+	spin_lock_init(&(first_dev.check_mtx_sl));
 
 	return 0;
 }
@@ -207,6 +211,41 @@ char *rgbled_perm(struct device *dev, umode_t *mode)
 
 int rgbled_gpio_config(void)
 {
+	int err = 0;
+
+/* ========== END VARIABLE LIST ========== */
+
+	if ((err = gpio_request_one(first_dev.red_pin.gpio, 
+								first_dev.red_pin.flags, 
+								first_dev.red_pin.label))) {
+		printk(KERN_ERR "E REQUESTING RED PIN\n");
+		return err;
+	} else 
+		red_pin_taken = true;
+
+	if ((err = gpio_request_one(first_dev.green_pin.gpio, 
+								first_dev.green_pin.flags, 
+								first_dev.green_pin.label))) {
+		printk(KERN_ERR "E REQUESTING GREEN PIN\n");
+		return err;
+	} else 
+		green_pin_taken = true;
+
+	if ((err = gpio_request_one(first_dev.blue_pin.gpio, 
+								first_dev.blue_pin.flags, 
+								first_dev.blue_pin.label))) {
+		printk(KERN_ERR "E REQUESTING BLUE PIN\n");
+		return err;
+	} else 
+		blue_pin_taken = true;
+
+	if ((err = gpio_request_one(first_dev.clk_pin.gpio, 
+								first_dev.clk_pin.flags, 
+								first_dev.clk_pin.label))) {
+		printk(KERN_ERR "E REQUESTING CLOCK PIN\n");
+		return err;
+	} else
+		clk_pin_taken = true;
 
 	return 0;
 }
@@ -270,6 +309,14 @@ void rgbled_exit(void)
 	printk(KERN_ALERT "rgbled leaving!\n");
 
 	/* Deallocate resources that were created in init() */
+	if (red_pin_taken)
+		gpio_free(first_dev.red_pin.gpio);
+	if (green_pin_taken)
+		gpio_free(first_dev.green_pin.gpio);
+	if (blue_pin_taken)
+		gpio_free(first_dev.blue_pin.gpio);
+	if (clk_pin_taken)
+		gpio_free(first_dev.clk_pin.gpio);
 	if (add_cdev)
 		cdev_del(&(first_dev.cdev));
 	if (create_device)
