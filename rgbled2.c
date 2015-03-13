@@ -69,15 +69,16 @@ static bool create_device = false;
 static bool create_class = false;
 
 /* Enumeration defines */
-enum state {low, high};
-enum direction {out, in};
+//enum state {low, high};
+//enum direction {out, in};
 
 /* Struct defines */
-struct rpi_gpio_pin {
-	const u8 pin_num;
-	enum state state;
-	enum direction dir;
-};
+//struct rpi_gpio_pin {
+//	const u8 pin_num;
+//	enum state state;
+//	enum direction dir;
+//};
+
 struct rgbled_dev {
 	struct cdev cdev;
 	struct class *rgbled_class;
@@ -86,10 +87,14 @@ struct rgbled_dev {
 	dev_t rgbled_major; 
 	dev_t rgbled_minor; 
 	spinlock_t check_mtx_sl;
-	struct rpi_gpio_pin red_pin;
-	struct rpi_gpio_pin green_pin;
-	struct rpi_gpio_pin blue_pin;
-	struct rpi_gpio_pin clk_pin;
+//	struct rpi_gpio_pin red_pin;
+//	struct rpi_gpio_pin green_pin;
+//	struct rpi_gpio_pin blue_pin;
+//	struct rpi_gpio_pin clk_pin;
+	struct gpio red_pin;
+	struct gpio green_pin;
+	struct gpio blue_pin;
+	struct gpio clk_pin;
 };
 
 /* Global variables */
@@ -98,18 +103,23 @@ static struct rgbled_dev first_dev = {
 	/* 0 for dynamic assignment */
 	.rgbled_major = 0, 
 	.rgbled_minor = 0, 
-	.red_pin = {.pin_num=15, .state=low, .dir=out},
-	.green_pin = {.pin_num=16, .state=low, .dir=out},
-	.blue_pin = {.pin_num=18, .state=low, .dir=out},
-	.clk_pin = {.pin_num=22, .state=low, .dir=out},
+//	.red_pin = {.pin_num=15, .state=low, .dir=out},
+//	.green_pin = {.pin_num=16, .state=low, .dir=out},
+//	.blue_pin = {.pin_num=18, .state=low, .dir=out},
+//	.clk_pin = {.pin_num=22, .state=low, .dir=out},
+	.red_pin = {.gpio=22, .flags=GPIOF_OUT_INIT_LOW, .label="LED red val"},
+	.green_pin = {.gpio=23, .flags=GPIOF_OUT_INIT_LOW, .label="LED green val"},
+	.blue_pin = {.gpio=24, .flags=GPIOF_OUT_INIT_LOW, .label="LED blue val"},
+	.clk_pin = {.gpio=25, .flags=GPIOF_OUT_INIT_LOW, .label="Clocks writes"},
 };
 static const struct file_operations rgbled_fops = {
 	.owner = THIS_MODULE,
 	.open = rgbled_open,
 	.release = rgbled_release,
+	.unlocked_ioctl = rgbled_unlocked_ioctl,
 	.write = NULL,
 	.read = NULL,
-	.unlocked_ioctl = rgbled_unlocked_ioctl,
+//Complete this list with NULLS
 };
 
 int rgbled_init(void)
