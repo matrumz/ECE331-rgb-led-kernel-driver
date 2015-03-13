@@ -265,7 +265,7 @@ int rgbled_open(struct inode *inode, struct file *filp)
 	 * Check open mode/permissions to make sure read only. 
 	 * acl_permission_check() return 0 on all permissions granted.
 	 */
-//	if ((filp->f_flags & O_ACCESS) != 0_RDONLY) {
+//	if ((filp->f_flags & O_ACCESS) != 0_WRONLY) {
 ////	if (!acl_permission_check(inode, MAY_WRITE)) {
 //		printk(KERN_WARNING "W PROCESS TRIED TO OPEN RGBLED2 WITH BAD PERMS\n");
 //		return -EACCES;
