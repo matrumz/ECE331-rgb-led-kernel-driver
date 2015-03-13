@@ -61,6 +61,7 @@ static int rgbled_set(u64 __user *);
 static char *rgbled_perm(struct device *dev, umode_t *mode);
 static long rgbled_unlocked_ioctl(struct file *, unsigned int, unsigned long);
 static int rgbled_gpio_config(void);
+static char get_int_bit(int, u16);
 
 /* Used to keep track of registrations to handle cleanup */
 static bool alloc_chrdev = false;
@@ -90,7 +91,7 @@ struct rgbled_dev {
 	dev_t devno;
 	dev_t rgbled_major; 
 	dev_t rgbled_minor; 
-	spinlock_t check_mtx_sl;
+//	spinlock_t check_mtx_sl;
 //	struct rpi_gpio_pin red_pin;
 //	struct rpi_gpio_pin green_pin;
 //	struct rpi_gpio_pin blue_pin;
@@ -195,7 +196,10 @@ int rgbled_init(void)
 	mutex_init(&(first_dev.write_mtx));
 
 	/* Initialize spinlocks */
-	spin_lock_init(&(first_dev.check_mtx_sl));
+//	spin_lock_init(&(first_dev.check_mtx_sl));
+
+// Test setting a color
+rgbled_set(NULL);
 
 	return 0;
 }
@@ -273,7 +277,18 @@ int rgbled_open(struct inode *inode, struct file *filp)
 
 /* ========== END VARIABLE LIST ========== */
 
-	/* User opens device file */
+	/* 
+	 * User opens file.
+	 * 
+	 * Check open mode/permissions to make sure read only. 
+	 * acl_permission_check() return 0 on all permissions granted.
+	 */
+//	if ((filp->f_flags & O_ACCESS) != 0_RDONLY) {
+////	if (!acl_permission_check(inode, MAY_WRITE)) {
+//		printk(KERN_WARNING "W PROCESS TRIED TO OPEN RGBLED2 WITH BAD PERMS\n");
+//		return -EACCES;
+//	}
+
 	dev = container_of(inode->i_cdev, struct rgbled_dev, cdev);
 	filp->private_data = dev;
 
@@ -289,6 +304,10 @@ int rgbled_release(struct inode *inode, struct file *filp)
 int rgbled_set(u64 *src)
 {
 	int err;
+	int i = 0;
+	u16 rtest = 2000;
+	u16 gtest = 0;
+	u16 btest = 0;
 
 /* ========== END VARIABLE LIST ========== */
 
@@ -300,8 +319,28 @@ int rgbled_set(u64 *src)
 		return err;
 
 	/* Write a value */
+	for (i = 0; i < 10; i++) {
+		gpio_set_value(first_dev.red_pin.gpio, (int)(!get_int_bit(i, rtest)));
+		gpio_set_value(first_dev.green_pin.gpio, (int)(!get_int_bit(i, gtest)));
+		gpio_set_value(first_dev.blue_pin.gpio, (int)(!get_int_bit(i, btest)));
+		gpio_set_value(first_dev.clk_pin.gpio, 1);
+		udelay(10);
+		gpio_set_value(first_dev.clk_pin.gpio, 0);
+		udelay(10);
+	}
+
+	/* Release mutex */
+	mutex_unlock(&(first_dev.write_mtx));
 
 	return 0;
+}
+
+char get_int_bit(int bit, u16 num)
+{
+	if ((num & (1 << bit)))
+		return 1;
+	else 
+		return 0;
 }
 
 void rgbled_exit(void)
