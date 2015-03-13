@@ -1,7 +1,7 @@
 /* vim: set tabstop=4 softtabstop=0 noexpandtab shiftwidth=4 : */
 /* 
  * Author: Mathew Rumsey
- * Date: 03 11 15
+ * Date: 03 12 15
  * 
  * This file contains the source code for ECE 331 Project #1.
  * This is a kernel module that interfaces with the RGB LED on Sheaff's 
@@ -14,6 +14,14 @@
  * The driver auto-magically creates the device special file with 
  * appropriate permissions.
  */
+
+/* 
+ * XMEGA TO GPIO PIN MAPPING
+ * red: 	GPIO22 = pin# 15
+ * green:	GPIO23 = pin# 16
+ * blue: 	GPIO24 = pin# 18
+ * clk:		GPIO25 = pin# 22
+*/
 
 #include <linux/module.h>	/* Need */
 #include <linux/kernel.h>	/* Need */
@@ -28,6 +36,7 @@
 #include <linux/cdev.h>		/* Char device registration */
 #include <linux/device.h>	/* Creation of device file */
 #include <linux/mutex.h>	/* Required for use of mutexes */
+#include <linux/gpio.h>		/* Required for use of GPIO pins */
 #include <asm/uaccess.h>	/* Move data to and from user-space */
 #include "myioctl.h"		/* My ioctl command is here (sync with user) */
 
@@ -51,6 +60,7 @@ static int rgbled_release(struct inode *, struct file *);
 static int rgbled_set(u64 __user *);
 static char *rgbled_perm(struct device *dev, umode_t *mode);
 static long rgbled_unlocked_ioctl(struct file *, unsigned int, unsigned long);
+static int rgbled_gpio_config(void);
 
 /* Used to keep track of registrations to handle cleanup */
 static bool alloc_chrdev = false;
@@ -58,15 +68,28 @@ static bool add_cdev = false;
 static bool create_device = false;
 static bool create_class = false;
 
+/* Enumeration defines */
+enum state {low, high};
+enum direction {out, in};
+
 /* Struct defines */
+struct rpi_gpio_pin {
+	const u8 pin_num;
+	enum state state;
+	enum direction dir;
+};
 struct rgbled_dev {
 	struct cdev cdev;
-	dev_t devno;
 	struct class *rgbled_class;
+	struct mutex write_mtx;
+	dev_t devno;
 	dev_t rgbled_major; 
 	dev_t rgbled_minor; 
 	spinlock_t check_mtx_sl;
-	struct mutex write_mtx;
+	struct rpi_gpio_pin red_pin;
+	struct rpi_gpio_pin green_pin;
+	struct rpi_gpio_pin blue_pin;
+	struct rpi_gpio_pin clk_pin;
 };
 
 /* Global variables */
@@ -75,6 +98,10 @@ static struct rgbled_dev first_dev = {
 	/* 0 for dynamic assignment */
 	.rgbled_major = 0, 
 	.rgbled_minor = 0, 
+	.red_pin = {.pin_num=15, .state=low, .dir=out},
+	.green_pin = {.pin_num=16, .state=low, .dir=out},
+	.blue_pin = {.pin_num=18, .state=low, .dir=out},
+	.clk_pin = {.pin_num=22, .state=low, .dir=out},
 };
 static const struct file_operations rgbled_fops = {
 	.owner = THIS_MODULE,
@@ -150,6 +177,12 @@ int rgbled_init(void)
 	/* Initialize spinlocks */
 	spin_lock_init(&(first_dev.check_mtx_sl));
 
+	/* Configure GPIO pins */
+	if ((err = rgbled_gpio_config())) {
+		rgbled_exit();
+		return err;
+	}
+
 	return 0;
 }
 
@@ -160,6 +193,12 @@ char *rgbled_perm(struct device *dev, umode_t *mode)
 		*mode = MODE;
 
 	return NULL;
+}
+
+int rgbled_gpio_config(void)
+{
+
+	return 0;
 }
 
 long rgbled_unlocked_ioctl(struct file * filp, unsigned int cmd, 
