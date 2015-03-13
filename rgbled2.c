@@ -265,11 +265,10 @@ int rgbled_open(struct inode *inode, struct file *filp)
 	 * Check open mode/permissions to make sure read only. 
 	 * acl_permission_check() return 0 on all permissions granted.
 	 */
-//	if ((filp->f_flags & O_ACCESS) != 0_WRONLY) {
-////	if (!acl_permission_check(inode, MAY_WRITE)) {
-//		printk(KERN_WARNING "W PROCESS TRIED TO OPEN RGBLED2 WITH BAD PERMS\n");
-//		return -EACCES;
-//	}
+	if ((filp->f_flags & O_ACCMODE) != O_WRONLY) {
+		printk(KERN_WARNING "W PROCESS TRIED TO OPEN RGBLED2 WITH BAD PERMS\n");
+		return -EACCES;
+	}
 
 	dev = container_of(inode->i_cdev, struct rgbled_dev, cdev);
 	filp->private_data = dev;
@@ -286,7 +285,7 @@ int rgbled_release(struct inode *inode, struct file *filp)
 int rgbled_write_color(COLOR * ucolor)
 {
 	int err = 0;
-	COLOR kcolor;
+	COLOR kcolor = {0,0,0};
 
 /* ========== END VARIABLE LIST ========== */
 
@@ -333,6 +332,8 @@ int rgbled_set(int rv, int gv, int bv)
 		printk(KERN_WARNING "W BAD COLOR NUMBER\n");
 		return -EINVAL;
 	}
+
+printk(KERN_NOTICE "Setting %d:%d:%d\n", rv, gv, bv);
 
 	/* Write a value */
 	for (i = 0; i < 10; i++) {

@@ -14,7 +14,7 @@ int main(int argc, char *argv[])
 	COLOR test;
 
 	/* Open device file */
-	if ((fd = open("/dev/rgbled", O_WRONLY, 0222)) <= 0) {
+	if ((fd = open("/dev/rgbled", O_WRONLY)) <= 0) {
 		perror("E OPEN");
 		return -1;
 	}

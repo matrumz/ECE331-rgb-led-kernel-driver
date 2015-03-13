@@ -22,5 +22,4 @@ mi: all install
 rc: remove clean
 
 test:
-	rm test
 	gcc -g -Wall -o test test.c
