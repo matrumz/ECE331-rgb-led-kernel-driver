@@ -1,7 +1,7 @@
 /* vim: set tabstop=4 softtabstop=0 noexpandtab shiftwidth=4 : */
 /* 
  * Author: Mathew Rumsey
- * Date: 03 13 15
+ * Date: 03 14 15
  * 
  * This file contains the source code for ECE 331 Project #1.
  * This is a kernel module that interfaces with the RGB LED on Sheaff's 
@@ -26,10 +26,10 @@
 #include <linux/module.h>	/* Need */
 #include <linux/kernel.h>	/* Need */
 #include <linux/init.h>		/* Allow rename init and exit functions */
-#include <linux/stat.h>		/* File status */
+//#include <linux/stat.h>		/* File status */
 #include <linux/fs.h>		/* Required for device drivers */
 #include <linux/types.h>	/* Required for dev_t (device numbers) */
-#include <linux/spinlock.h>	/* Required for spinlocks */
+//#include <linux/spinlock.h>	/* Required for spinlocks */
 #include <linux/ioctl.h>	/* Required for ioctl commands */
 #include <linux/delay.h>	/* Required for udelay */
 #include <linux/errno.h>	/* Set error messages */
@@ -54,15 +54,15 @@
 
 /* Function prototypes */
 static int __init rgbled_init(void);
-static void rgbled_exit(void);
+static int rgbled_gpio_config(void);
 static int rgbled_open(struct inode *, struct file *);
 static int rgbled_release(struct inode *, struct file *); 
+static int rgbled_write_color(COLOR __user *);
 static int rgbled_set(int, int, int);
+static char get_int_bit(int, u16);
 static char *rgbled_perm(struct device *dev, umode_t *mode);
 static long rgbled_unlocked_ioctl(struct file *, unsigned int, unsigned long);
-static int rgbled_gpio_config(void);
-static char get_int_bit(int, u16);
-static int rgbled_write_color(COLOR __user *);
+static void rgbled_exit(void);
 
 /* Used to keep track of registrations to handle cleanup */
 static bool alloc_chrdev = false;
@@ -74,21 +74,18 @@ static bool green_pin_taken = false;
 static bool blue_pin_taken = false;
 static bool clk_pin_taken = false;
 
-/* Enumeration defines */
-//enum state {low, high};
-//enum direction {out, in};
-
+/* Custom struct defines */
 struct rgbled_dev {
 	struct cdev cdev;
 	struct class *rgbled_class;
 	struct mutex write_mtx;
-	dev_t devno;
-	dev_t rgbled_major; 
-	dev_t rgbled_minor; 
 	struct gpio red_pin;
 	struct gpio green_pin;
 	struct gpio blue_pin;
 	struct gpio clk_pin;
+	dev_t devno;
+	dev_t rgbled_major; 
+	dev_t rgbled_minor; 
 };
 
 /* Global variables */
@@ -97,6 +94,7 @@ static struct rgbled_dev first_dev = {
 	/* 0 for dynamic assignment */
 	.rgbled_major = 0, 
 	.rgbled_minor = 0, 
+	/* Set GPIO pin configurations: GPIO#, OUTPUT, DESCRIPTION */
 	.red_pin = {.gpio=22, .flags=GPIOF_OUT_INIT_LOW, .label="LED red val"},
 	.green_pin = {.gpio=23, .flags=GPIOF_OUT_INIT_LOW, .label="LED green val"},
 	.blue_pin = {.gpio=24, .flags=GPIOF_OUT_INIT_LOW, .label="LED blue val"},
@@ -107,9 +105,23 @@ static const struct file_operations rgbled_fops = {
 	.open = rgbled_open,
 	.release = rgbled_release,
 	.unlocked_ioctl = rgbled_unlocked_ioctl,
+	.llseek = NULL,
 	.write = NULL,
 	.read = NULL,
-//Complete this list with NULLS
+	.aio_read = NULL,
+	.aio_write = NULL,
+	.read_iter = NULL,
+	.write_iter = NULL,
+	.iterate = NULL,
+	.poll = NULL,
+	.compat_ioctl = NULL,
+	.flush = NULL,
+	.fsync = NULL,
+	.aio_fsync = NULL,
+	.fasync = NULL,
+	.sendpage = NULL,
+	.splice_write = NULL,
+	.splice_read = NULL,
 };
 
 int rgbled_init(void)
