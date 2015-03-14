@@ -335,11 +335,18 @@ int rgbled_set(int rv, int gv, int bv)
 
 printk(KERN_NOTICE "Setting %d:%d:%d\n", rv, gv, bv);
 
-	/* Write a value */
-	for (i = 0; i < 10; i++) {
-		gpio_set_value_cansleep(first_dev.red_pin.gpio, (int)(!get_int_bit(i, rv)));
-		gpio_set_value_cansleep(first_dev.green_pin.gpio, (int)(!get_int_bit(i, gv)));
-		gpio_set_value_cansleep(first_dev.blue_pin.gpio, (int)(!get_int_bit(i, bv)));
+	/* 
+	 * Write a value.
+	 * Values are 11 bits and written MSb first
+	 * as each bit is shifted into the LSb of the value stored on the XMEGA.
+	 */
+	for (i = 10; i >= 0; i--) {
+		gpio_set_value_cansleep(first_dev.red_pin.gpio, 
+								(int)(!get_int_bit(i, rv)));
+		gpio_set_value_cansleep(first_dev.green_pin.gpio, 
+								(int)(!get_int_bit(i, gv)));
+		gpio_set_value_cansleep(first_dev.blue_pin.gpio, 
+								(int)(!get_int_bit(i, bv)));
 		gpio_set_value_cansleep(first_dev.clk_pin.gpio, 1);
 		udelay(10);
 		gpio_set_value_cansleep(first_dev.clk_pin.gpio, 0);
