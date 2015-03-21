@@ -18,8 +18,8 @@ my ($rr, $rg, $rb);
 my $output;
 
 # Spam ./test with random values the number of times indicated from argument
-my $i = 0;
-for $i (1..$executions) {
+my $j = 0;
+for my $i (1..$executions) {
 	$rr = int(rand(2048));
 	$rg = int(rand(2048));
 	$rb = int(rand(2048));
@@ -32,6 +32,7 @@ for $i (1..$executions) {
 		# Clear error for next execution
 		$output = "";
 	}
+	$j++;
 }
 
-print "PID $pid did $i executions\n";
+print "PID $pid did $j executions\n";
