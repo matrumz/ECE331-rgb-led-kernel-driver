@@ -32,7 +32,9 @@ for my $i (1..$executions) {
 		# Clear error for next execution
 		$output = "";
 	}
-	$j++;
+	else {
+		$j++;
+	}
 }
 
 print "PID $pid did $j executions\n";
