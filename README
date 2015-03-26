@@ -1,0 +1,28 @@
+Author: Mathew Rumsey
+Date: 03 26 15
+
+This is my ECE331 Project #1. It is a kernel module that interfaces with the RGB LED on sheaff's RPi function generator expansion board. It allows one or more processes to open the RGB LED devices special file that is created by the kernel module, but only one process at a time can write to the GPIO pins while completing the 11 bit data write pattern. If any process opens the device special file as read/write or read-only, it receives and appropriate error and is denied, as the RGB LED is a write-only device.
+
+Contained within this project is a C program "test.c" that is used for writing values to the device. This can be run on the command line for single, specified color changes, or the Perl script "suite.pl" can be used to start a specified number of threads to write a specified number of random colors to the LED using the "test.c" program. 
+
+USING "test.c"
+1.* Compile kernel module and test.c with:
+'#make'
+2.* Install kernel module with:
+'#make install'
+3. Run compiled test.c with:
+'#./test x y z' 
+	where x, y, and z are integers from 0 to 2047, inclusive.
+
+USING "suite.pl"
+1.* Compile kernel module and test.c with:
+'#make'
+2.* Install kernel module with:
+'#make install'
+3. Run "suite.pl" with:
+'#./suite.pl x y' 
+	where x is an integer number of threads and y is an integer number of random colors to write.
+
+
+*Steps 1 and 2 in both "USING "test.c"" and "USING "suite.pl"" can be replaced with:
+'#make mi'
