@@ -155,9 +155,13 @@ int rgbled_init(void)
 	}
 	/* Catch device number allocation error or set task as completed */
 	if (err) {
-		printk(KERN_ERR "E REGISTERING DEVICE NUMBERS : %d\n", -err );
+		printk(KERN_ERR "E REGISTERING DEVICE NUMBERS : %d\n", err );
 		rgbled_exit();
-		return -err;
+		/* 
+		 * register_chrdev_region and alloc_chrdev_region 
+		 * return <0 for errors. 
+		 */
+		return err; 
 	} else
 		alloc_chrdev = true;
 
@@ -166,6 +170,7 @@ int rgbled_init(void)
 	if ((err = IS_ERR(first_dev.rgbled_class))) {
 		printk(KERN_ERR "E CREATING CLASS : %d\n", -err);
 		rgbled_exit();
+		/* IS_ERR has >0 return values for errors */
 		return -err;
 	} else
 		create_class = true;
@@ -180,6 +185,7 @@ int rgbled_init(void)
 	if ((err = IS_ERR(test_device_create))) {
 		printk(KERN_ERR "E CREATING DEVICE : %d\n", -err);
 		rgbled_exit();
+		/* IS_ERR has >0 return values for errors */
 		return -err;
 	} else 
 		create_device = true;
@@ -189,15 +195,17 @@ int rgbled_init(void)
 	first_dev.cdev.owner = THIS_MODULE;
 	first_dev.cdev.ops = &rgbled_fops;
 	if ((err = cdev_add(&(first_dev.cdev), first_dev.devno, COUNT))) {
-		printk(KERN_ERR "E ADDING CDEV : %d", -err);
+		printk(KERN_ERR "E ADDING CDEV : %d", err);
 		rgbled_exit();
-		return -err;
+		/* cdev_add has <0 return values for errors */
+		return err;
 	} else
 		add_cdev = true;
 	
 	/* Configure GPIO pins */
 	if ((err = rgbled_gpio_config())) {
 		rgbled_exit();
+		/* rgbled_gpio_config has <0 return values for errors */
 		return err;
 	}
 
@@ -236,6 +244,7 @@ int rgbled_gpio_config(void)
 								first_dev.red_pin.flags, 
 								first_dev.red_pin.label))) {
 		printk(KERN_ERR "E REQUESTING RED PIN\n");
+		/* gpio_request_one has <0 return values for errors */
 		return err;
 	} else 
 		red_pin_taken = true;
@@ -245,6 +254,7 @@ int rgbled_gpio_config(void)
 								first_dev.green_pin.flags, 
 								first_dev.green_pin.label))) {
 		printk(KERN_ERR "E REQUESTING GREEN PIN\n");
+		/* gpio_request_one has <0 return values for errors */
 		return err;
 	} else 
 		green_pin_taken = true;
@@ -254,6 +264,7 @@ int rgbled_gpio_config(void)
 								first_dev.blue_pin.flags, 
 								first_dev.blue_pin.label))) {
 		printk(KERN_ERR "E REQUESTING BLUE PIN\n");
+		/* gpio_request_one has <0 return values for errors */
 		return err;
 	} else 
 		blue_pin_taken = true;
@@ -263,6 +274,7 @@ int rgbled_gpio_config(void)
 								first_dev.clk_pin.flags, 
 								first_dev.clk_pin.label))) {
 		printk(KERN_ERR "E REQUESTING CLOCK PIN\n");
+		/* gpio_request_one has <0 return values for errors */
 		return err;
 	} else
 		clk_pin_taken = true;
@@ -281,6 +293,7 @@ long rgbled_unlocked_ioctl(struct file * filp, unsigned int cmd,
 	/* Service list of ioctl() commands */
 	switch (cmd) {
 		case (IOCTL_WRITE): /* User set LED color */
+			/* rgbled_write_color has <0 return values for errors */
 			return rgbled_write_color((COLOR *)arg);
 			break;
 		default: /* User entered bad command */
@@ -352,10 +365,12 @@ int rgbled_write_color(COLOR * ucolor)
 	 */
 	if ((err = mutex_lock_interruptible(&(first_dev.write_mtx)))) {
 		printk(KERN_WARNING "W WAITING PROCESS INTERRUPTED\n");
+		/* mutex_lock_interruptible has <0 return values for errors */
 		return err;
 	}
 
 	/* Set LED color */
+	/* rgbled_set has <0 return values for errors */
 	err = rgbled_set(kcolor.r, kcolor.g, kcolor.b);
 
 	/* Release mutex */
