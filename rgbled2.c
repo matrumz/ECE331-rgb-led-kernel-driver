@@ -1,7 +1,7 @@
 /* vim: set tabstop=4 softtabstop=0 noexpandtab shiftwidth=4 : */
 /* 
  * Author: Mathew Rumsey
- * Date: 03 14 15
+ * Date: 03 28 15
  * 
  * This file contains the source code for ECE 331 Project #1.
  * This is a kernel module that interfaces with the RGB LED on Sheaff's 
